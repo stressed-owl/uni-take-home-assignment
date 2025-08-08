@@ -17,11 +17,13 @@ scrape_configs:
       - targets: ["localhost:9090"]
 
   - job_name: "fb-collector"
+    scrape_interval: 1m
     static_configs:
       - targets: ["fb-collector:8003"]
     metrics_path: "/metrics"
 
   - job_name: "ttk-collector"
+    scrape_interval: 1m
     static_configs:
       - targets: ["ttk-collector:8004"]
     metrics_path: "/metrics"

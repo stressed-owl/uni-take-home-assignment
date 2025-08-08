@@ -1,0 +1,16 @@
+services:
+  publisher:
+    ports:
+      - "${PUBLISHER_PORT}:${PUBLISHER_PORT}"
+    environment:
+      LOG_LEVEL: debug
+
+  prometheus:
+    ports:
+      - "${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
+    command:
+      - --storage.tsdb.retention.time=15d
+
+  grafana:
+    ports:
+      - "${GRAFANA_PORT}:${GRAFANA_PORT}"
