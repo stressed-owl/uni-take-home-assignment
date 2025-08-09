@@ -3,6 +3,8 @@ services:
     image: andriiuni/events
     container_name: publisher
     restart: always
+    environment:
+      EVENT_ENDPOINT: ${EVENT_ENDPOINT}
     networks:
       - app-network
 
@@ -23,8 +25,20 @@ services:
     networks:
       - app-network
 
+  nats:
+    image: nats:2.11.7-alpine
+    container_name: nats
+    restart: unless-stopped
+    command: "-c /etc/nats/nats.conf"
+    volumes:
+      - ./nats/nats.conf:/etc/nats/nats.conf:ro
+      - nats_data:/data/jetstream
+    networks:
+      - app-network
+
   prometheus:
     image: prom/prometheus:v3.5.0
+    container_name: prometheus
     restart: unless-stopped
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
@@ -41,6 +55,7 @@ services:
 
   grafana:
     image: grafana/grafana:12.2.0-16557133545
+    container_name: grafana
     restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
@@ -56,8 +71,13 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
   prometheus_data:
+    driver: local
   grafana_data:
+    driver: local
+  nats_data:
+    driver: local
 
 networks:
   app-network:

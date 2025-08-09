@@ -5,6 +5,14 @@ services:
     environment:
       LOG_LEVEL: debug
 
+  nats:
+    ports:
+      - "${NATS_PORT}:${NATS_PORT}"
+      - "${NATS_MONITORING_PORT}:${NATS_MONITORING_PORT}"
+    environment:
+      - NATS_USER=${NATS_USER}
+      - NATS_PASSWORD=${NATS_PASSWORD}
+
   prometheus:
     ports:
       - "${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
