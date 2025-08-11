@@ -1,5 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
-import { FbCollectorService } from './fb-collector.service';
+import { Controller, Get } from "@nestjs/common";
+import { FbCollectorService } from "./fb-collector.service";
 
 @Controller()
 export class FbCollectorController {

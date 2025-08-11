@@ -10,23 +10,8 @@
 # Variables
 # ------------------------------------------------------------------------------------
 # Image Name
-IMAGE_NAME = event-system
-
-# Dockerfiles
-DEV_DOCKERFILE = src/docker/dev/Dockerfile
-PROD_DOCKERFILE = src/docker/prod/Dockerfile
-
-# Docker Compose files
-BASE_COMPOSE_FILE = src/docker/base/docker-compose.yml
-DEV_COMPOSE_FILE = src/docker/dev/docker-compose.dev.yml
-PROD_COMPOSE_FILE = src/docker/prod/docker-compose.prod.yml
-
-# Combined compose file flags
-DEV_COMPOSE_FILES = -f $(BASE_COMPOSE_FILE) -f $(DEV_COMPOSE_FILE)
-PROD_COMPOSE_FILES = -f $(BASE_COMPOSE_FILE) -f $(PROD_COMPOSE_FILE)
-
-# Shell for exec commands
-SHELL_CMD = sh
+DEV_COMPOSE = docker-compose -f deployment/compose/docker-compose.yml -f deployment/compose/docker-compose.dev.yml --env-file .env.dev
+PROD_COMPOSE = docker-compose -f deployment/compose/docker-compose.yml -f deployment/compose/docker-compose.prod.yml --env-file .env.prod
 
 # ====================================================================================
 # Help Target
@@ -40,20 +25,22 @@ help:
 	@echo "  help                  - Shows this help message."
 	@echo ""
 	@echo "  --- Development ---"
-	@echo "  dev-build             - Builds the development Docker image."
+	@echo "  dev-build             - Builds all development service images."
 	@echo "  dev-up                - Builds and starts the development environment."
-	@echo "  dev-down              - Stops the development environment."
-	@echo "  dev-logs              - Tails the logs of the development environment."
+	@echo "  dev-down              - Stops and removes development containers."
+	@echo "  dev-logs [service=...] - Tails logs for dev. Specify a service or view all."
 	@echo "  dev-ps                - Shows the status of containers in the dev environment."
-	@echo "  dev-restart           - Restarts the development environment."
 	@echo ""
 	@echo "  --- Production ---"
-	@echo "  prod-build            - Builds the production Docker image."
+	@echo "  prod-build            - Builds all production service images."
 	@echo "  prod-up               - Builds and starts the production environment."
-	@echo "  prod-down             - Stops the production environment."
-	@echo "  prod-logs             - Tails the logs of the production environment."
+	@echo "  prod-down             - Stops and removes production containers."
+	@echo "  prod-logs [service=...] - Tails logs for prod. Specify a service or view all."
 	@echo "  prod-ps               - Shows the status of containers in the prod environment."
-	@echo "  prod-restart          - Restarts the production environment."
+	@echo ""
+	@echo "  --- Cleanup ---"
+	@echo "  clean                 - Prunes stopped containers and dangling volumes/images."
+	@echo "  clean-all             - DANGER: Stops all envs and removes all docker data."
 	@echo ""
 
 # ====================================================================================
@@ -61,62 +48,48 @@ help:
 # ====================================================================================
 
 dev-build:
-	@echo "Building Docker image for development (tag: $(IMAGE_NAME):latest)..."
-	docker build -t $(IMAGE_NAME) -f $(DEV_DOCKERFILE) .
+	@echo "Building Docker images for development..."
+	$(DEV_COMPOSE) build
 
-dev-up: dev-build
+dev-up:
 	@echo "Starting development environment..."
-	docker-compose $(DEV_COMPOSE_FILES) up -d
+	$(DEV_COMPOSE) up -d --build
 
 dev-down:
 	@echo "Stopping development environment..."
-	docker-compose $(DEV_COMPOSE_FILES) down --remove-orphans
+	$(DEV_COMPOSE) down --remove-orphans
 
 dev-logs:
 	@echo "Tailing logs for development environment..."
-	docker-compose $(DEV_COMPOSE_FILES) logs -f
+	$(DEV_COMPOSE) logs -f $(service)
 
 dev-ps:
 	@echo "Checking status of development environment..."
-	docker-compose $(DEV_COMPOSE_FILES) ps
-
-dev-restart:
-	@echo "Restarting development environment..."
-	docker-compose $(DEV_COMPOSE_FILES) restart
+	$(DEV_COMPOSE) ps
 
 # ====================================================================================
 # Production Environment Commands
 # ====================================================================================
 
-.PHONY: prod-build
 prod-build:
-	@echo "Building Docker image for production (tag: $(IMAGE_NAME):latest)..."
-	docker build -t $(IMAGE_NAME) -f $(PROD_DOCKERFILE) .
+	@echo "Building Docker images for production..."
+	$(PROD_COMPOSE) build
 
-.PHONY: prod-up
-prod-up: prod-build
+prod-up:
 	@echo "Starting production environment..."
-	docker-compose $(PROD_COMPOSE_FILES) up -d
+	$(PROD_COMPOSE) up -d --build
 
-.PHONY: prod-down
 prod-down:
 	@echo "Stopping production environment..."
-	docker-compose $(PROD_COMPOSE_FILES) down --remove-orphans
+	$(PROD_COMPOSE) down --remove-orphans
 
-.PHONY: prod-logs
 prod-logs:
 	@echo "Tailing logs for production environment..."
-	docker-compose $(PROD_COMPOSE_FILES) logs -f
+	$(PROD_COMPOSE) logs -f $(service)
 
-.PHONY: prod-ps
 prod-ps:
 	@echo "Checking status of production environment..."
-	docker-compose $(PROD_COMPOSE_FILES) ps
-
-.PHONY: prod-restart
-prod-restart:
-	@echo "Restarting production environment..."
-	docker-compose $(PROD_COMPOSE_FILES) restart
+	$(PROD_COMPOSE) ps
 
 # ====================================================================================
 # Cleanup Commands

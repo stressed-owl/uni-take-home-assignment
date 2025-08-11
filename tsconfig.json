@@ -23,6 +23,18 @@
       ],
       "@app/common/*": [
         "libs/common/src/*"
+      ],
+      "@app/nats": [
+        "libs/nats/src"
+      ],
+      "@app/nats-client": [
+        "libs/nats-client/src"
+      ],
+      "@app/nats-client/*": [
+        "libs/nats-client/src/*"
+      ],
+      "@app/nats/*": [
+        "libs/nats/src/*"
       ]
     }
   }

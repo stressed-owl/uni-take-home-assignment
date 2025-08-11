@@ -1,5 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
-import { TtkCollectorService } from './ttk-collector.service';
+import { Controller, Get } from "@nestjs/common";
+import { TtkCollectorService } from "./ttk-collector.service";
 
 @Controller()
 export class TtkCollectorController {

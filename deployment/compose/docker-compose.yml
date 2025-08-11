@@ -1,29 +1,78 @@
+volumes:
+  postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  nats_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
+  monitoring:
+    driver: bridge
+
 services:
   publisher:
     image: andriiuni/events
     container_name: publisher
     restart: always
-    environment:
-      EVENT_ENDPOINT: ${EVENT_ENDPOINT}
+    networks:
+      - app-network
+
+  gateway:
+    container_name: gateway
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  fb-collector:
+    container_name: fb-collector
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  ttk-collector:
+    container_name: ttk-collector
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  reporter:
+    container_name: reporter
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
     networks:
       - app-network
 
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app-network
+      # Mount the initialization script. It will run only once on first start.
+      - ./deployment/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
 
   nats:
     image: nats:2.11.7-alpine
@@ -57,30 +106,9 @@ services:
     image: grafana/grafana:12.2.0-16557133545
     container_name: grafana
     restart: unless-stopped
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_AUTH_ANONYMOUS_ENABLED=false
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
     networks:
       - monitoring
-
-volumes:
-  postgres_data:
-    driver: local
-  prometheus_data:
-    driver: local
-  grafana_data:
-    driver: local
-  nats_data:
-    driver: local
-
-networks:
-  app-network:
-    driver: bridge
-  monitoring:
-    driver: bridge

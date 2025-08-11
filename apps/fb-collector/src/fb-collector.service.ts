@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
+import { NatsClientService } from "@app/nats-client";
 
 @Injectable()
 export class FbCollectorService {
-  getHello(): string {
-    return 'Hello World!';
+  constructor(private readonly natsClientService: NatsClientService) {}
+
+  async consumeMessage() {
+
   }
 }

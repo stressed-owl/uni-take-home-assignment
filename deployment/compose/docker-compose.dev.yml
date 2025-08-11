@@ -1,0 +1,215 @@
+services:
+  publisher:
+    ports:
+      - "${PUBLISHER_PORT}:${PUBLISHER_PORT}"
+    environment:
+      NODE_ENV: dev
+      LOG_LEVEL: debug
+      EVENT_ENDPOINT: ${EVENT_ENDPOINT}
+
+  gateway:
+    build:
+      context: .
+      dockerfile: ../../dev.Dockerfile
+      args:
+        APP_NAME: gateway
+    ports:
+      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
+    volumes:
+      - ./apps/gateway:/app/apps/gateway
+      - ./libs:/app/libs
+      - /app/node_modules
+    environment:
+      NODE_ENV: dev
+      LOG_LEVEL: debug
+    depends_on:
+      publisher:
+        condition: service_started
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${GATEWAY_PORT}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  fb-collector-migrate:
+    build:
+      context: .
+      dockerfile: ../../dev.Dockerfile
+      args:
+        APP_NAME: fb-collector
+    command: [ "npm", "run", "db:deploy" ]
+    environment:
+      NODE_ENV: dev
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${FB_COLLECTOR_DB_NAME}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  fb-collector:
+    build:
+      context: .
+      dockerfile: ../../dev.Dockerfile
+      args:
+        APP_NAME: fb-collector
+    ports:
+      - "${FB_COLLECTOR_PORT}:${FB_COLLECTOR_PORT}"
+    volumes:
+      - ./apps/fb-collector:/app/apps/fb-collector
+      - ./libs:/app/libs
+      - /app/node_modules
+    environment:
+      NODE_ENV: dev
+      LOG_LEVEL: debug
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${FB_COLLECTOR_DB_NAME}
+    depends_on:
+      fb-collector-migrate:
+        condition: service_completed_successfully
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${FB_COLLECTOR_PORT}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  ttk-collector-migrate:
+    build:
+      context: .
+      dockerfile: ../../dev.Dockerfile
+      args:
+        APP_NAME: ttk-collector
+    command: [ "npm", "run", "db:deploy" ]
+    environment:
+      NODE_ENV: dev
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${TTK_COLLECTOR_DB_PORT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ttk-collector:
+    build:
+      context: .
+      dockerfile: ../../dev.Dockerfile
+      args:
+        APP_NAME: ttk-collector
+    ports:
+      - "${TTK_COLLECTOR_PORT}:${TTK_COLLECTOR_PORT}"
+    volumes:
+      - ./apps/ttk-collector:/app/apps/ttk-collector
+      - ./libs:/app/libs
+      - /app/node_modules
+    depends_on:
+      ttk-collector-migrate:
+        condition: service_completed_successfully
+      nats:
+        condition: service_healthy
+    environment:
+      NODE_ENV: dev
+      LOG_LEVEL: debug
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${TTK_COLLECTOR_DB_PORT}
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${TTK_COLLECTOR_PORT}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  reporter-migrate:
+    build:
+      context: .
+      dockerfile: ../../dev.Dockerfile
+      args:
+        APP_NAME: reporter
+    command: [ "npm", "run", "db:deploy" ]
+    environment:
+      NODE_ENV: dev
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT)/${REPORTER_DB_NAME}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  reporter:
+    build:
+      context: .
+      dockerfile: ../../dev.Dockerfile
+      args:
+        APP_NAME: reporter
+    ports:
+      - "${REPORTER_PORT}:${REPORTER_PORT}"
+    volumes:
+      - ./apps/reporter:/app/apps/reporter
+      - ./libs:/app/libs
+      - /app/node_modules
+    depends_on:
+      reporter-migrate:
+        condition: service_completed_successfully
+      nats:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: dev
+      LOG_LEVEL: debug
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${REPORTER_PORT}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    ports:
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    ports:
+      - "${NATS_PORT}:${NATS_PORT}"
+      - "${NATS_MONITORING_PORT}:${NATS_MONITORING_PORT}"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${NATS_MONITORING_URL}/varz" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    environment:
+      NODE_ENV: dev
+      NATS_USER: ${NATS_USER}
+      NATS_PASSWORD: ${NATS_PASSWORD}
+
+  prometheus:
+    environment:
+      NODE_ENV: dev
+    ports:
+      - "${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${PROMETHEUS_PORT}/-/healthy" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    command:
+      - --storage.tsdb.retention.time=15d
+
+  grafana:
+    environment:
+      NODE_ENV: dev
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_AUTH_ANONYMOUS_ENABLED: false
+    ports:
+      - "${GRAFANA_PORT}:${GRAFANA_PORT}"
+    healthcheck:
+      test: [ "CMD", "curl", "f", "http://localhost:${GRAFANA_PORT}/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

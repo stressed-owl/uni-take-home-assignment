@@ -1,0 +1,312 @@
+secrets:
+  fb-collector_db_url:
+    file: ../../.secrets/fb-collector/fb-collector_db_url.txt
+
+  ttk-collector_db_url:
+    file: ../../.secrets/ttk-collector/ttk-collector_db_url.txt
+
+  reporter_db_url:
+    file: ../../.secrets/reporter/reporter_db_url.txt
+
+  postgres_password:
+    file: ../../.secrets/postgres/postgres_password.txt
+  postgres_username:
+    file: ../../.secrets/postgres/postgres_username.txt
+
+  grafana_admin_password:
+    file: ../../.secrets/grafana/grafana_admin_password.txt
+
+  nats_password:
+    file: ../../.secrets/nats/nats_password.txt
+
+services:
+  publisher:
+    environment:
+      EVENT_ENDPOINT: ${EVENT_ENDPOINT}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  gateway:
+    build:
+      context: .
+      dockerfile: ../../prod.Dockerfile
+      args:
+        APP_NAME: gateway
+    environment:
+      NODE_ENV: prod
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${GATEWAY_PORT}/health/liveness" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  fb-collector-migrate:
+    build:
+      context: .
+      dockerfile: ../../prod.Dockerfile
+      args:
+        APP_NAME: fb-collector
+    command: [ "npm", "run", "db:deploy" ]
+    environment:
+      DATABASE_URL_FILE: /run/secrets/fb-collector_db_url
+    secrets:
+      - fb-collector_db_url
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  fb-collector:
+    build:
+      context: .
+      dockerfile: ../../prod.Dockerfile
+      args:
+        APP_NAME: fb-collector
+    environment:
+      NODE_ENV: prod
+      LOG_LEVEL: info
+      DATABASE_URL_FILE: /run/secrets/fb-collector_db_url
+    secrets:
+      - fb-collector_db_url
+    depends_on:
+      fb-collector-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${FB_COLLECTOR_PORT}/health/readiness" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  ttk-collector-migrate:
+    build:
+      context: .
+      dockerfile: ../../prod.Dockerfile
+      args:
+        APP_NAME: ttk-collector
+    command: [ "npm", "run", "db:deploy" ]
+    environment:
+      DATABASE_URL_FILE: /run/secrets/ttk-collector_db_url
+    secrets:
+      - ttk-collector_db_url
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  ttk-collector:
+    build:
+      context: .
+      dockerfile: ../../prod.Dockerfile
+      args:
+        APP_NAME: ttk-collector
+    environment:
+      NODE_ENV: prod
+      LOG_LEVEL: info
+      DATABASE_URL_FILE: /run/secrets/ttk-collector_db_url
+    secrets:
+      - ttk-collector_db_url
+    depends_on:
+      ttk-collector-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${TTK_COLLECTOR_PORT}/health/readiness" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  reporter-migrate:
+    build:
+      context: .
+      dockerfile: ../../prod.Dockerfile
+      args:
+        APP_NAME: reporter
+    command: [ "npm", "run", "db:deploy" ]
+    environment:
+      DATABASE_URL_FILE: /run/secrets/reporter_db_url
+    secrets:
+      - reporter_db_url
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  reporter:
+    build:
+      context: .
+      dockerfile: ../../prod.Dockerfile
+      args:
+        APP_NAME: reporter
+    environment:
+      NODE_ENV: prod
+      LOG_LEVEL: info
+      DATABASE_URL_FILE: /run/secrets/reporter_db_url
+    secrets:
+      - reporter_db_url
+    depends_on:
+      reporter-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${REPORTER_PORT}/health/readiness" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  postgres:
+    environment:
+      POSTGRES_USER_FILE: /run/secrets/postgres_username
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_username
+      - postgres_password
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$(cat /run/secrets/postgres_username)" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  prometheus:
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${PROMETHEUS_PORT}/-/healthy" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    command:
+      - --storage.tsdb.retention.time=${PROM_RETENTION}
+
+  grafana:
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password.txt
+    secrets:
+      - grafana_admin_password
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${GRAFANA_PORT}/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: nginx_proxy
+    ports:
+      - "${NGINX_HTTP_PORT}:${NGINX_HTTP_PORT}"
+      - "${NGINX_HTTPS_PORT}:${NGINX_HTTPS_PORT}"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # We might also mount SSL certificates for HTTPS in the future
+#      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - publisher
+      - grafana
+    networks:
+      - app-network
+      - monitoring
+    healthcheck:
+      test: [ "CMD", "curl", "f", "http://localhost:${NGINX_HTTP_PORT}/health" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+
+  nats:
+    environment:
+      NATS_USER: ${NATS_USER}
+      NATS_PASSWORD_FILE: /run/secrets/nats_password
+    secrets:
+      - nats_password
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${NATS_MONITORING_PORT}/varz" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M

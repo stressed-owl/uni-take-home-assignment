@@ -1,14 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
-  "sourceRoot": "apps/uni-take-home-assignment/src",
+  "sourceRoot": "apps/gateway/src",
   "compilerOptions": {
     "deleteOutDir": true,
     "webpack": true,
-    "tsConfigPath": "apps/uni-take-home-assignment/tsconfig.app.json"
+    "tsConfigPath": "apps/gateway/tsconfig.app.json"
   },
   "monorepo": true,
-  "root": "apps/uni-take-home-assignment",
+  "root": "apps/gateway",
   "projects": {
     "common": {
       "type": "library",
@@ -37,6 +37,15 @@
         "tsConfigPath": "apps/gateway/tsconfig.app.json"
       }
     },
+    "nats-client": {
+      "type": "library",
+      "root": "libs/nats-client",
+      "entryFile": "index",
+      "sourceRoot": "libs/nats-client/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/nats-client/tsconfig.lib.json"
+      }
+    },
     "reporter": {
       "type": "application",
       "root": "apps/reporter",
@@ -53,15 +62,6 @@
       "sourceRoot": "apps/ttk-collector/src",
       "compilerOptions": {
         "tsConfigPath": "apps/ttk-collector/tsconfig.app.json"
-      }
-    },
-    "uni-take-home-assignment": {
-      "type": "application",
-      "root": "apps/uni-take-home-assignment",
-      "entryFile": "main",
-      "sourceRoot": "apps/uni-take-home-assignment/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/uni-take-home-assignment/tsconfig.app.json"
       }
     }
   }
